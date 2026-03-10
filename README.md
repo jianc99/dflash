@@ -15,15 +15,18 @@ https://github.com/user-attachments/assets/5b29cabb-eb95-44c9-8ffe-367c0758de8c
 ## 📦 Model Support Plan
 
 ### ✅ Supported
+- **Qwen/Qwen3.5-4B** (Preview): https://huggingface.co/z-lab/Qwen3.5-4B-DFlash
+- **Qwen/Qwen3.5-9B** (Preview): https://huggingface.co/z-lab/Qwen3.5-9B-DFlash
+- **Qwen/Qwen3.5-35B-A3B** (Preview): https://huggingface.co/z-lab/Qwen3.5-35B-A3B-DFlash
+- **Qwen/Qwen3-Coder-Next** (Preview): https://huggingface.co/z-lab/Qwen3-Coder-Next-DFlash
 - **openai/gpt-oss-20b**: https://huggingface.co/z-lab/gpt-oss-20b-DFlash
+- **openai/gpt-oss-120b**: https://huggingface.co/z-lab/gpt-oss-120b-DFlash
 - **Qwen3-4B**: https://huggingface.co/z-lab/Qwen3-4B-DFlash-b16  
 - **Qwen3-8B**: https://huggingface.co/z-lab/Qwen3-8B-DFlash-b16  
 - **Qwen3-Coder-30B-A3B**: https://huggingface.co/z-lab/Qwen3-Coder-30B-A3B-DFlash
 - **Llama-3.1-8B-Instruct**: https://huggingface.co/z-lab/LLaMA3.1-8B-Instruct-DFlash-UltraChat
 
 ### 🚧 Coming Soon
-- **Qwen/Qwen3-Coder-Next** (Very soon)
-- **openai/gpt-oss-120b**  
 - **zai-org/GLM-4.7**
 - **zai-org/GLM-4.7-Flash**
 
