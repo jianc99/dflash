@@ -11,6 +11,9 @@ from tqdm import tqdm
 from transformers import AutoModelForCausalLM, AutoTokenizer, DynamicCache
 from model import DFlashDraftModel, sample, load_and_process_dataset, extract_context_feature
 import distributed as dist
+import matplotlib.pyplot as plt
+from matplotlib.pyplot import gca
+import os
 
 def cuda_time() -> float:
     torch.cuda.synchronize()
@@ -129,6 +132,65 @@ def dflash_generate(
     )
 
 
+def visualize_benchmark_results(responses, block_size, output_dir="benchmark_plots"):
+    """
+    Visualize benchmark results including:
+    - Distribution of acceptance lengths (histogram)
+    - Time per output token distribution (box plot if multi-sample)
+    """
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Collect all acceptance lengths
+    all_acceptance_lengths = list(chain(*[r[block_size].acceptance_lengths for r in responses]))
+    
+    # Calculate means
+    mean_speedup = np.mean([r[block_size].time_per_output_token for r in responses])
+    mean_overlap = np.mean([r[block_size].acceptance_lengths.mean() for r in responses])
+    
+    tau = np.mean([np.mean(r[block_size].acceptance_lengths) for r in responses])
+    
+    # Histogram of acceptance lengths
+    plt.figure(figsize=(12, 6))
+    
+    # Sort acceptance lengths for visualization
+    acceptance_lengths_sorted = sorted(all_acceptance_lengths)
+    bin_edges = np.arange(block_size + 2)
+    
+    colors = plt.cm.viridis(np.linspace(0, 1, block_size + 1))
+    
+    for b in range(block_size + 1):
+        if b < len(colors):
+            plt.axvline(x=b, color=colors[b], linestyle='-', linewidth=2, label=f'B={b}', alpha=0.7)
+    
+    plt.hist(
+        acceptance_lengths_sorted,
+        bins=np.arange(block_size + 2),
+        density=False,
+        color=colors[1:] + [colors[0]],
+        edgecolor='black',
+        alpha=0.6,
+        linewidth=0.8,
+        label='Distribution',
+        labelstack=True
+    )
+    
+    # Add distribution statistics
+    plt.axvline(x=tau, color='red', linestyle='--', linewidth=2, label=f'Mean Acceptance Length ({tau:.2f})', alpha=0.8)
+    
+    plt.xlabel('Acceptance Length', fontsize=12)
+    plt.ylabel('Normalized Count', fontsize=12)
+    plt.title(f'dFlash Benchmark Results (Block Size = {block_size})', fontsize=14, fontweight='bold')
+    plt.legend(loc='upper right', fontsize=10)
+    plt.grid(True, alpha=0.3)
+    plt.xticks(range(block_size + 1))
+    plt.tight_layout()
+    
+    plot_path = os.path.join(output_dir, f'acceptance_length_hist.png')
+    plt.savefig(plot_path, dpi=150, bbox_inches='tight')
+    plt.close()
+    print(f"Saved acceptance length histogram: {plot_path}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--model-name-or-path", type=str, required=True)
@@ -214,8 +276,9 @@ def main() -> None:
         responses = dist.gather(responses, dst=0)
         if not dist.is_main():
             return
-        responses = list(chain(*responses))
+        responses = list(chain(*responses,))
 
+    # Calculate metrics
     t1 = np.mean([r[1].time_per_output_token for r in responses])
     tb = np.mean([r[block_size].time_per_output_token for r in responses])
     print(f"Decoding speedup: {t1 / tb:.2f}")
@@ -226,6 +289,20 @@ def main() -> None:
     acceptance_lengths = list(chain(*[r[block_size].acceptance_lengths for r in responses]))
     histogram = [acceptance_lengths.count(b) / len(acceptance_lengths) for b in range(block_size + 1)]
     print(f"Acceptance length histogram: {[f'{x * 100:.1f}%' for x in histogram]}")
+
+    # Generate visualizations
+    if dist.is_main():
+        output_dir = "benchmark_plots" if args.max_samples is None else "benchmark_plots"
+        visualize_benchmark_results(responses, block_size, output_dir)
+        # Also save acceptance length histogram as text
+        histogram_text_path = os.path.join(output_dir, "histogram.txt")
+        with open(histogram_text_path, 'w') as f:
+            f.write(f"Acceptance Length Histogram\n")
+            f.write(f"{'Length':<15} {'Count%':<15}\n")
+            f.write(f"{'-'*15} {'-'*15}\n")
+            for b in range(block_size + 1):
+                f.write(f"{b:<15} {histogram[b] * 100:%<15}\n")
+        print(f"\nSaved histogram text: {histogram_text_path}")
 
 if __name__ == "__main__":
     main()
